@@ -27,21 +27,28 @@ async def download_video(url):
         info = ydl.extract_info(url, download=True)
         return ydl.prepare_filename(info)
 
-# 🔹 Function ពិនិត្យ Douyin Video URL
+# 🔹 Function ទាញយក Douyin Video URL
 def get_douyin_video_url(video_url):
     """ Function ទាញយក Douyin Video URL """
     match = re.search(r"video/(\d+)", video_url)
     if not match:
         return None
     video_id = match.group(1)
-    api_url = f"https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}"
+
+    api_urls = [
+        f"https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}",
+        f"https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id={video_id}"
+    ]
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(api_url, headers=headers)
-    data = response.json()
-    
-    if "item_list" in data and data["item_list"]:
-        return data["item_list"][0]["video"]["play_addr"]["url_list"][0]
-    return None
+
+    for api_url in api_urls:
+        response = requests.get(api_url, headers=headers)
+        data = response.json()
+
+        if "item_list" in data and data["item_list"]:
+            return data["item_list"][0]["video"]["play_addr"]["url_list"][0]
+
+    return None  # ❌ Video Not Found
 
 # 🔹 Function Start Bot
 async def start(update: Update, context: CallbackContext):
