@@ -33,7 +33,7 @@ async def handle_message(update: Update, context: CallbackContext):
         await update.message.reply_text('មិនអាចទាញយកវីដេអូបានទេ។')
 
 # មុខងារដើម្បីចាប់ផ្តើម bot
-async def main():
+def main():
     # បង្កើត Application
     application = Application.builder().token(TOKEN).build()
 
@@ -42,8 +42,7 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # ចាប់ផ្តើម bot
-    await application.run_polling()
+    application.run_polling()
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    main()
