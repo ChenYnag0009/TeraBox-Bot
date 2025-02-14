@@ -1,7 +1,8 @@
 import requests
 import re
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
+from telegram.ext import filters
 
 # បញ្ចូល API Token របស់អ្នក
 TOKEN = '8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk'
@@ -38,7 +39,7 @@ def main():
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dp.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     updater.start_polling()
     updater.idle()
