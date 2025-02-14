@@ -1,22 +1,23 @@
 import os
 import yt_dlp
 from telegram import Update
-from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackContext
+from telegram.ext import Application, MessageHandler, filters, CallbackContext
 
-# ⛔️ ដាក់ Token API របស់ Telegram Bot
+# Telegram Bot API Token
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# ✅ Function ទាញយកវីដេអូពី Douyin
+# Function ទាញយកវីដេអូពី Douyin
 def download_douyin_video(url):
     ydl_opts = {
         "format": "best",
         "outtmpl": "douyin_video.mp4",
+        "cookiefile": "cookies.txt",  # ប្រើ cookies ដើម្បីអោយ Douyin អនុញ្ញាត
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
     return "douyin_video.mp4"
 
-# ✅ Function ដើម្បីប្រើ Bot
+# Function ដើម្បីប្រើ Bot
 async def handle_message(update: Update, context: CallbackContext):
     user_text = update.message.text
     if "douyin.com" in user_text:
@@ -30,7 +31,7 @@ async def handle_message(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("📌 សូមផ្ញើ Link Douyin!")
 
-# ✅ Function ដើម្បីចាប់ផ្តើម Bot
+# Function ដើម្បីចាប់ផ្តើម Bot
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
