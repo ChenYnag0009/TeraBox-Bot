@@ -11,26 +11,22 @@ from telegram.ext import Application, MessageHandler, filters, CallbackContext
 # ✅ Telegram Bot API Token
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# ✅ Chrome WebDriver Path
-CHROMEDRIVER_PATH = "./chromedriver"
-
 # ✅ Function ដើម្បីទាញយក Video URL ពី Douyin
 def get_douyin_video_url(video_url):
     options = Options()
-    options.add_argument("--headless")  # Run Chrome in headless mode
+    options.add_argument("--headless")  # Run in headless mode
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
 
-    service = Service(CHROMEDRIVER_PATH)
+    # ✅ បញ្ជាក់ path ទៅ WebDriver
+    service = Service("/usr/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
 
     try:
         driver.get(video_url)
-        time.sleep(5)  # 🕒 រងចាំ 5 វិនាទីអោយវាបើកចេញ
-
+        time.sleep(5)  # 🕒 រងចាំ 5 វិនាទី
         video_element = driver.find_element(By.TAG_NAME, "video")
         video_src = video_element.get_attribute("src")
-
         return video_src
     except Exception as e:
         print(f"Error: {e}")
