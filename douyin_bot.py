@@ -35,7 +35,7 @@ def handle_message(update: Update, context: CallbackContext):
 
 # មុខងារដើម្បីចាប់ផ្តើម bot
 def main():
-    updater = Updater(TOKEN, use_context=True)
+    updater = Updater(TOKEN)  # លុប use_context=True
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
