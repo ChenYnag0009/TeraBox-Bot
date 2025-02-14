@@ -1,61 +1,34 @@
-import os
-import logging
-import yt_dlp
 from pyrogram import Client, filters
+import requests
 
-# Telegram Bot Credentials
-API_ID = "26775695"
+# Telegram Bot API Credentials
+API_ID = "26775695"  # បញ្ចូល API ID របស់អ្នក
 API_HASH = "b15bb60859bef151762fc5d9eb206c67"
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# Configure Logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+# ចាប់ផ្តើម Bot
+bot = Client("tiktok_downloader", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Create Bot Client
-app = Client("douyin_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Function ទាញយកវីដេអូ TikTok
+def download_tiktok_video(url):
+    api_url = f"https://api.tikmate.app/api/lookup?url={url}"
+    response = requests.get(api_url).json()
+    if "videoUrl" in response:
+        return response["videoUrl"]
+    return None
 
-# Download Function
-def download_douyin_video(url):
-    try:
-        output_dir = "downloads"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
-        ydl_opts = {
-            "format": "best",
-            "outtmpl": f"{output_dir}/%(title)s.%(ext)s",
-            "quiet": True,
-            "nocheckcertificate": True,  # Avoid SSL certificate issues
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            video_path = ydl.prepare_filename(info)
-            return video_path
-    except Exception as e:
-        logging.error(f"Error downloading video: {e}")
-        return None
-
-# Start Command
-@app.on_message(filters.command("start"))
-def start(client, message):
-    message.reply_text("សួស្ដី! ផ្ញើលីង Douyin ដើម្បីទាញយកវីដេអូ។")
-
-# Handle Douyin Video Links
-@app.on_message(filters.text & filters.regex(r"https?://www\.douyin\.com/video/\d+"))
-def download_video(client, message):
-    url = message.text
-    logging.debug(f"Received URL: {url}")  # Log the URL to check it
-    message.reply_text("⏳ កំពុងទាញយកវីដេអូ...")
-
-    video_path = download_douyin_video(url)
-    if video_path:
-        logging.debug(f"Video path: {video_path}")  # Log the video path
-        message.reply_video(video_path, caption="✅ Douyin Video Downloaded!")
-        os.remove(video_path)  # Delete after sending
+# Command ទាញយក TikTok
+@bot.on_message(filters.command("tiktok") & filters.private)
+def tiktok_download(client, message):
+    chat_id = message.chat.id
+    if len(message.command) < 2:
+        message.reply("សូមបញ្ជូល Link TikTok!")
+        return
+    
+    video_url = download_tiktok_video(message.command[1])
+    if video_url:
+        message.reply_video(video_url, caption="វីដេអូរបស់អ្នក")
     else:
-        logging.error(f"Failed to download video: {url}")  # Log the failure
-        message.reply_text("❌ មិនអាចទាញយកវីដេអូបាន!")
+        message.reply("មិនអាចទាញយកបាន!")
 
-# Run the bot
-app.run()
+bot.run()
