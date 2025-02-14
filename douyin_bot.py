@@ -1,8 +1,7 @@
 import requests
 import re
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
-from telegram.ext import filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # បញ្ចូល API Token របស់អ្នក
 TOKEN = '8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk'
@@ -21,28 +20,30 @@ def extract_video_url(url):
     return None
 
 # មុខងារដើម្បីដំណើរការពាក្យបញ្ជា /start
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text('សួស្តី! សូមផ្ញើតំណភ្ជាប់ Douyin មកខ្ញុំដើម្បីទាញយកវីដេអូ។')
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text('សួស្តី! សូមផ្ញើតំណភ្ជាប់ Douyin មកខ្ញុំដើម្បីទាញយកវីដេអូ។')
 
 # មុខងារដើម្បីដំណើរការតំណភ្ជាប់
-def handle_message(update: Update, context: CallbackContext):
+async def handle_message(update: Update, context: CallbackContext):
     url = update.message.text
     video_url = extract_video_url(url)
     if video_url:
-        update.message.reply_video(video_url)
+        await update.message.reply_video(video_url)
     else:
-        update.message.reply_text('មិនអាចទាញយកវីដេអូបានទេ។')
+        await update.message.reply_text('មិនអាចទាញយកវីដេអូបានទេ។')
 
 # មុខងារដើម្បីចាប់ផ្តើម bot
-def main():
-    updater = Updater(TOKEN)  # លុប use_context=True
-    dp = updater.dispatcher
+async def main():
+    # បង្កើត Application
+    application = Application.builder().token(TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # បន្ថែម handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    updater.start_polling()
-    updater.idle()
+    # ចាប់ផ្តើម bot
+    await application.run_polling()
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
