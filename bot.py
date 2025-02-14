@@ -1,24 +1,26 @@
 import os
-import re
-import requests
+import time
 import yt_dlp
 import undetected_chromedriver as uc
-import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 # 🟢 Telegram Bot Token (ប្តូរតាម Bot របស់អ្នក)
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# 🟢 Telegram Chat ID (Channel ឬ Group ID)
-CHAT_ID = "@https://t.me/+OFh_AF1NpII1ZTRl"
-
 # 📂 Directory សម្រាប់ទាញយក
 DOWNLOAD_DIR = "downloads"
 
+# 🟢 Telegram Channel/Group ID
+CHAT_ID = "@your_channel_or_group"
+
 # 🔹 Function ទាញយកវីដេអូពី TikTok / Douyin
 async def download_video(url):
-    """ Function ទាញយកវីដេអូពី TikTok / Douyin """
+    """ Function to Download Video from TikTok/Douyin """
     options = {
         "format": "best",
         "outtmpl": f"{DOWNLOAD_DIR}/%(title)s.%(ext)s",
@@ -33,7 +35,12 @@ async def download_video(url):
 def get_douyin_video_url(video_url):
     """ Scrape Douyin Video URL using Selenium """
     try:
-        driver = uc.Chrome()
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         driver.get(video_url)
         time.sleep(5)  # Wait for page to load
 
@@ -46,46 +53,21 @@ def get_douyin_video_url(video_url):
         print(f"❌ Error: {e}")
         return None
 
-# 🔹 Function ទាញយករូបភាពពី TikTok
-def download_tiktok_images(url):
-    """ Function ទាញយករូបភាពពី TikTok """
-    options = {"quiet": True, "skip_download": True}
-    
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(url, download=False)
-
-        if "photo_collection" in info:
-            images = [img["url"] for img in info["photo_collection"]]
-            return images
-
-    return None
-
-# 🔹 Function Start Bot
-async def start(update: Update, context: CallbackContext):
-    """ Function ចាប់ផ្តើម Bot """
-    await update.message.reply_text("👋 សួស្តី! បញ្ជូន link TikTok ឬ Douyin មកខ្ញុំ!")
-
-# 🔹 Function Handle Message
+# 🔹 Function to Handle Messages
 async def handle_message(update: Update, context: CallbackContext):
-    """ Function ប xử lý Link TikTok / Douyin """
+    """ Function to Handle TikTok/Douyin Links """
     url = update.message.text
 
     if "tiktok.com" in url:
         await update.message.reply_text("🔍 កំពុងពិនិត្យ TikTok Link...")
 
-        # ✅ ពិនិត្យរូបភាព
-        images = download_tiktok_images(url)
-        if images:
-            for img_url in images:
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=img_url, caption="🖼 TikTok Image")
-            return
-        
-        # ✅ ប្រសិនបើមិនមែនរូបភាព → ទាញយកវីដេអូ
+        # ✅ ទាញយកវីដេអូ TikTok
         video_path = await download_video(url)
     
     elif "douyin.com" in url:
         await update.message.reply_text("🔍 កំពុងទាញយកវីដេអូ Douyin...")
-        
+
+        # ✅ ទាញយកវីដេអូ Douyin
         video_url = get_douyin_video_url(url)
         if not video_url:
             await update.message.reply_text("❌ មិនអាចទាញយក Douyin Video បាន!")
@@ -108,9 +90,14 @@ async def handle_message(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ ទាញយកបរាជ័យ!")
 
+# 🔹 Function Start Bot
+async def start(update: Update, context: CallbackContext):
+    """ Function to Start the Bot """
+    await update.message.reply_text("👋 សួស្តី! បញ្ជូន link TikTok ឬ Douyin មកខ្ញុំ!")
+
 # 🔹 Function Run Bot
 def main():
-    """ ចាប់ផ្តើម Telegram Bot """
+    """ Run the Telegram Bot """
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
