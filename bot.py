@@ -1,34 +1,36 @@
-from pyrogram import Client, filters
-import requests
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+import yt_dlp
 
-# Telegram Bot API Credentials
-API_ID = "26775695"  # បញ្ចូល API ID របស់អ្នក
-API_HASH = "b15bb60859bef151762fc5d9eb206c67"
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# ចាប់ផ្តើម Bot
-bot = Client("tiktok_downloader", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+def download_video(url):
+    options = {
+        'format': 'best',
+        'outtmpl': 'downloads/%(title)s.%(ext)s'
+    }
+    with yt_dlp.YoutubeDL(options) as ydl:
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
 
-# Function ទាញយកវីដេអូ TikTok
-def download_tiktok_video(url):
-    api_url = f"https://api.tikmate.app/api/lookup?url={url}"
-    response = requests.get(api_url).json()
-    if "videoUrl" in response:
-        return response["videoUrl"]
-    return None
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Send me a TikTok or Douyin link!")
 
-# Command ទាញយក TikTok
-@bot.on_message(filters.command("tiktok") & filters.private)
-def tiktok_download(client, message):
-    chat_id = message.chat.id
-    if len(message.command) < 2:
-        message.reply("សូមបញ្ជូល Link TikTok!")
-        return
-    
-    video_url = download_tiktok_video(message.command[1])
-    if video_url:
-        message.reply_video(video_url, caption="វីដេអូរបស់អ្នក")
+def handle_message(update: Update, context: CallbackContext):
+    url = update.message.text
+    if "tiktok.com" in url or "douyin.com" in url:
+        video_path = download_video(url)
+        update.message.reply_video(video=open(video_path, 'rb'))
     else:
-        message.reply("មិនអាចទាញយកបាន!")
+        update.message.reply_text("Send a valid TikTok or Douyin link!")
 
-bot.run()
+def main():
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
