@@ -4,7 +4,7 @@ import urllib
 from pyquery import PyQuery as PQ
 import logging
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Set up logging to get error messages in Telegram bot
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -45,30 +45,30 @@ def extract_video_info(url):
     return author, title, video_url
 
 # Telegram bot function to handle video requests
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Welcome! Please send a Douyin video URL to download.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Welcome! Please send a Douyin video URL to download.")
 
-def download(update: Update, context: CallbackContext):
+async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         url = update.message.text.strip()
         video_url = get_douyin_url(url)
         author, title, video_url = extract_video_info(video_url)
-        update.message.reply_text(f"Starting download: {title} by {author}...")
+        await update.message.reply_text(f"Starting download: {title} by {author}...")
         status = download_video(author, title, video_url)
-        update.message.reply_text(status)
+        await update.message.reply_text(status)
     except Exception as e:
-        update.message.reply_text(f"Error occurred: {str(e)}")
+        await update.message.reply_text(f"Error occurred: {str(e)}")
 
 def main():
     # Replace 'YOUR_TOKEN' with your Telegram Bot API token
-    updater = Updater('8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk', use_context=True)
+    application = Application.builder().token('8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk').build()
 
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("download", download))
+    # Adding command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("download", download))
 
-    updater.start_polling()
-    updater.idle()
+    # Start the bot
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
