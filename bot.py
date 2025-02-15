@@ -1,147 +1,80 @@
 import os
-import time
-import asyncio
-from playwright.async_api import async_playwright
+import re
 import requests
+import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from playwright.async_api import async_playwright
 
-# 🟢 Telegram Bot Token
+# Telegram Bot Token
 BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
 
-# 📂 Directory for downloading files (Videos, Images)
-DOWNLOAD_DIR = "downloads"
+# Douyin Video Downloader
+async def download_douyin_video(url):
+    try:
+        ydl_opts = {
+            "outtmpl": "douyin_video.mp4",
+            "format": "best",
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        return "douyin_video.mp4"
+    except Exception as e:
+        print(f"Download error: {e}")
+        return None
 
-# 🟢 Telegram Channel/Group ID
-CHAT_ID = "@your_channel_or_group"
-
-# 🔹 Download Video from TikTok or Douyin using Playwright
-async def download_video(url):
-    """ Function to download video from TikTok/Douyin using Async Playwright """
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url)
-        
-        # Wait for the video to load
-        await page.wait_for_selector("video")
-
-        # Find video source URL
-        video_url = await page.locator("video").get_attribute("src")
-        if video_url:
-            video_path = f"{DOWNLOAD_DIR}/video.mp4"
-            # Download video
-            await page.goto(video_url)
-            with open(video_path, 'wb') as f:
-                f.write(await page.content())
-            await browser.close()
-            return video_path
-        else:
-            await browser.close()
-            return None
-
-# 🔹 Download Profile Image from TikTok
-async def download_tiktok_image(url):
-    """ Function to download TikTok profile picture using Async Playwright """
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url)
-        
-        # Wait for the profile image to load
-        await page.wait_for_selector("img")
-        
-        # Extract the profile image source URL
-        img_url = await page.locator("img").get_attribute("src")
-        if img_url:
-            img_path = f"{DOWNLOAD_DIR}/tiktok_profile.jpg"
-            response = requests.get(img_url)
-            if response.status_code == 200:
-                with open(img_path, "wb") as file:
-                    file.write(response.content)
-            await browser.close()
-            return img_path
-        else:
-            await browser.close()
-            return None
-
-# 🔹 Download Thumbnail Image from Douyin
+# Douyin Image Downloader
 async def download_douyin_image(url):
-    """ Function to download Douyin thumbnail image using Async Playwright """
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url)
         
-        # Wait for the thumbnail to load
         await page.wait_for_selector("img")
-        
-        # Extract the thumbnail image URL
         img_url = await page.locator("img").get_attribute("src")
+
         if img_url:
-            img_path = f"{DOWNLOAD_DIR}/douyin_thumbnail.jpg"
-            response = requests.get(img_url)
-            if response.status_code == 200:
-                with open(img_path, "wb") as file:
-                    file.write(response.content)
+            img_path = "douyin_image.jpg"
+            img_data = requests.get(img_url).content
+            with open(img_path, "wb") as f:
+                f.write(img_data)
             await browser.close()
             return img_path
-        else:
-            await browser.close()
-            return None
+        await browser.close()
+        return None
 
-# 🔹 Handle Messages and URLs
+# Handle Telegram Messages
 async def handle_message(update: Update, context: CallbackContext):
-    """ Function to handle incoming URLs """
     url = update.message.text.strip()
 
-    if "tiktok.com" in url:
-        await update.message.reply_text("🔍 Searching and downloading your video or image...")
+    if "douyin.com" in url:
+        await update.message.reply_text("🔍 Downloading from Douyin...")
 
-        if "photo" in url:  # Handle image download from TikTok
-            image_path = await download_tiktok_image(url)
-            if image_path and os.path.exists(image_path):
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(image_path, "rb"), caption="📸 Your TikTok profile image")
-                os.remove(image_path)  # 🗑️ Clean up the downloaded image
-            else:
-                await update.message.reply_text("❌ Unable to download the TikTok profile image!")
-        else:  # Handle video download from TikTok
-            video_path = await download_video(url)
-            if video_path and os.path.exists(video_path):
-                await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, "rb"), caption="🎬 Your downloaded video")
-                os.remove(video_path)  # 🗑️ Clean up the downloaded file
-            else:
-                await update.message.reply_text("❌ Unable to download the video!")
+        # Download Video
+        video_path = await download_douyin_video(url)
+        if video_path and os.path.exists(video_path):
+            await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, "rb"), caption="🎬 Your Douyin Video")
+            os.remove(video_path)
+        else:
+            await update.message.reply_text("❌ Failed to download video!")
 
-    elif "douyin.com" in url:
-        await update.message.reply_text("🔍 Searching and downloading your video or image...")
-
-        if "photo" in url:  # Handle image download from Douyin
-            image_path = await download_douyin_image(url)
-            if image_path and os.path.exists(image_path):
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(image_path, "rb"), caption="📸 Your Douyin thumbnail image")
-                os.remove(image_path)  # 🗑️ Clean up the downloaded image
-            else:
-                await update.message.reply_text("❌ Unable to download the Douyin thumbnail image!")
-        else:  # Handle video download from Douyin
-            video_path = await download_video(url)
-            if video_path and os.path.exists(video_path):
-                await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, "rb"), caption="🎬 Your downloaded video")
-                os.remove(video_path)  # 🗑️ Clean up the downloaded file
-            else:
-                await update.message.reply_text("❌ Unable to download the video!")
+        # Download Image
+        image_path = await download_douyin_image(url)
+        if image_path and os.path.exists(image_path):
+            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(image_path, "rb"), caption="📸 Your Douyin Image")
+            os.remove(image_path)
+        else:
+            await update.message.reply_text("❌ Failed to download image!")
 
     else:
-        await update.message.reply_text("❌ Please send a valid TikTok or Douyin video URL!")
+        await update.message.reply_text("❌ Please send a valid Douyin URL!")
 
-# 🔹 Start Command
+# Start Command Handler
 async def start(update: Update, context: CallbackContext):
-    """ Start the bot and send welcome message """
-    await update.message.reply_text("👋 Hello! Send a TikTok or Douyin video or image link and I'll download it for you!")
+    await update.message.reply_text("👋 Send me a Douyin video/image link and I'll download it for you!")
 
-# 🔹 Run the Bot
+# Main function to start the bot
 def main():
-    """ Run the Telegram Bot """
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -150,8 +83,5 @@ def main():
     print("🚀 Bot is running...")
     app.run_polling()
 
-# 🔥 Start the Bot
 if __name__ == "__main__":
-    if not os.path.exists(DOWNLOAD_DIR):
-        os.makedirs(DOWNLOAD_DIR)
     main()
