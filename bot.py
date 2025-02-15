@@ -1,87 +1,74 @@
 import os
-import re
 import requests
-import yt_dlp
+import urllib
+from pyquery import PyQuery as PQ
+import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-from playwright.async_api import async_playwright
+from telegram.ext import Updater, CommandHandler, CallbackContext
 
-# Telegram Bot Token
-BOT_TOKEN = "8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk"
+# Set up logging to get error messages in Telegram bot
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Douyin Video Downloader
-async def download_douyin_video(url):
+# Function to download Douyin video
+def download_video(download_author, title, url):
+    if download_author not in os.listdir():
+        os.mkdir(download_author)
+    response_video = requests.get(url)
+    with open(f"{download_author}/{title}.mp4", 'wb') as file:
+        file.write(response_video.content)
+    return f"{title} 下载完成！"
+
+# Function to get Douyin video URL
+def get_douyin_url(url):
+    if 'douyin.com/video/' in url:
+        return url
+    response = requests.get(url, allow_redirects=False)
+    get_url = response.headers['Location']
+    if 'douyin.com/share/video/' in get_url:
+        get_url = get_douyin_url(get_url)
+    return get_url
+
+# Main function to extract video and author info
+def extract_video_info(url):
+    response = requests.get(url)
+    data = PQ(response.text)
+    title = data('title').text()
+    script = data('script#RENDER_DATA').text()
+    script_js = urllib.parse.unquote(script)
+    title1 = script_js.find('"nickname":"')
+    title2 = script_js.find('","remarkName"')
+    author = script_js[title1+12:title2]
+    url1 = script_js.find('"playApi":"')
+    url2 = script_js.find('","bitRateList"')
+    video_url = 'http:' + script_js[url1+11:url2]
+    return author, title, video_url
+
+# Telegram bot function to handle video requests
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text("Welcome! Please send a Douyin video URL to download.")
+
+def download(update: Update, context: CallbackContext):
     try:
-        ydl_opts = {
-            "outtmpl": "douyin_video.mp4",
-            "format": "best",
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return "douyin_video.mp4"
+        url = update.message.text.strip()
+        video_url = get_douyin_url(url)
+        author, title, video_url = extract_video_info(video_url)
+        update.message.reply_text(f"Starting download: {title} by {author}...")
+        status = download_video(author, title, video_url)
+        update.message.reply_text(status)
     except Exception as e:
-        print(f"Download error: {e}")
-        return None
+        update.message.reply_text(f"Error occurred: {str(e)}")
 
-# Douyin Image Downloader
-async def download_douyin_image(url):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url)
-        
-        await page.wait_for_selector("img")
-        img_url = await page.locator("img").get_attribute("src")
-
-        if img_url:
-            img_path = "douyin_image.jpg"
-            img_data = requests.get(img_url).content
-            with open(img_path, "wb") as f:
-                f.write(img_data)
-            await browser.close()
-            return img_path
-        await browser.close()
-        return None
-
-# Handle Telegram Messages
-async def handle_message(update: Update, context: CallbackContext):
-    url = update.message.text.strip()
-
-    if "douyin.com" in url:
-        await update.message.reply_text("🔍 Downloading from Douyin...")
-
-        # Download Video
-        video_path = await download_douyin_video(url)
-        if video_path and os.path.exists(video_path):
-            await context.bot.send_video(chat_id=update.effective_chat.id, video=open(video_path, "rb"), caption="🎬 Your Douyin Video")
-            os.remove(video_path)
-        else:
-            await update.message.reply_text("❌ Failed to download video!")
-
-        # Download Image
-        image_path = await download_douyin_image(url)
-        if image_path and os.path.exists(image_path):
-            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(image_path, "rb"), caption="📸 Your Douyin Image")
-            os.remove(image_path)
-        else:
-            await update.message.reply_text("❌ Failed to download image!")
-
-    else:
-        await update.message.reply_text("❌ Please send a valid Douyin URL!")
-
-# Start Command Handler
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("👋 Send me a Douyin video/image link and I'll download it for you!")
-
-# Main function to start the bot
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    # Replace 'YOUR_TOKEN' with your Telegram Bot API token
+    updater = Updater('8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk', use_context=True)
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("download", download))
 
-    print("🚀 Bot is running...")
-    app.run_polling()
+    updater.start_polling()
+    updater.idle()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
