@@ -1,98 +1,56 @@
 import os
 import requests
-import urllib
-from pyquery import PyQuery as PQ
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-import logging
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
 
-# Set up logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Token Bot
+TOKEN = "7949532801:AAEt7J_hZeqvpD84onD9e8ndHILSCyKkWLw"
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
 
-# Function to download Douyin video
-def download_video(download_author, title, url):
-    if not os.path.exists(download_author):
-        os.makedirs(download_author)
-    response_video = requests.get(url)
-    video_path = os.path.join(download_author, f"{title}.mp4")
-    with open(video_path, 'wb') as file:
-        file.write(response_video.content)
-    return video_path
+# ថតសម្រាប់ផ្ទុកឯកសារ Download
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# Function to get the actual Douyin video URL
-def get_douyin_url(url):
-    if 'douyin.com/video/' in url:
-        return url
-    response = requests.get(url, allow_redirects=False)
-    get_url = response.headers['Location']
-    if 'douyin.com/share/video/' in get_url:
-        get_url = get_douyin_url(get_url)
-    return get_url
+@dp.message_handler(commands=['start'])
+async def start_cmd(message: types.Message):
+    await message.reply("👋 សួស្តី! ផ្ញើលิงค์ TeraBox មកខ្ញុំ ដើម្បីទាញយកឯកសារ។")
 
-# Function to extract video information (title, author, video URL)
-def extract_video_info(url):
-    response = requests.get(url)
-    data = PQ(response.text)
-    title = data('title').text()
-    script = data('script#RENDER_DATA').text()
-    script_js = urllib.parse.unquote(script)
-    title1 = script_js.find('"nickname":"')
-    title2 = script_js.find('","remarkName"')
-    author = script_js[title1+12:title2]
-    url1 = script_js.find('"playApi":"')
-    url2 = script_js.find('","bitRateList"')
-    video_url = 'http:' + script_js[url1+11:url2]
-    return author, title, video_url
-
-# Command to start the bot
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome! Please send a Douyin video URL to download and upload.")
-
-# Function to handle video download and upload to Telegram
-async def download_and_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        # Get the URL from the user's message
-        url = update.message.text.strip()
+@dp.message_handler()
+async def handle_link(message: types.Message):
+    url = message.text.strip()
+    if "terabox.com" in url or "1024terabox.com" in url:
+        await message.reply("🔄 កំពុងដោនឡូត...")
         
-        # Get the Douyin video URL
-        video_url = get_douyin_url(url)
-        author, title, video_url = extract_video_info(video_url)
+        # បម្លែង TeraBox Link ទៅជា Direct Download Link
+        direct_link = f"https://teradlrobot.cheemsbackup.workers.dev/?url={url}"
 
-        # Send message indicating the bot is starting the download
-        await update.message.reply_text(f"Downloading: {title} by {author}...")
-
-        # Download the video
-        video_path = download_video(author, title, video_url)
-
-        # Send the video to the user
-        with open(video_path, 'rb') as video_file:
-            await update.message.reply_video(video=video_file, caption=f"{title} by {author}")
-
-        # Optionally, remove the video file after upload
-        os.remove(video_path)
+        # បង្កើតឈ្មោះឯកសារ
+        file_name = os.path.join(DOWNLOAD_FOLDER, "downloaded_file")
         
-    except Exception as e:
-        await update.message.reply_text(f"Error occurred: {str(e)}")
+        # Download File
+        response = requests.get(direct_link, stream=True)
+        if response.status_code == 200:
+            with open(file_name, "wb") as file:
+                for chunk in response.iter_content(1024):
+                    file.write(chunk)
 
-# Function to handle errors
-def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.warning(f"Update {update} caused error {context.error}")
+            await message.reply("✅ ដោនឡូតជោគជ័យ! កំពុងផ្ញើឯកសារ...")
 
-# Main function to set up the bot
-def main():
-    # Replace 'YOUR_TOKEN' with your Telegram bot token
-    application = Application.builder().token('8108185474:AAHhUu6H9BeEp0ZHN46V_sjvK2FtViwMUYk').build()
+            # ផ្ញើឯកសារទៅ Telegram
+            with open(file_name, "rb") as file:
+                await message.answer_document(file)
 
-    # Command and message handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_and_upload))
+            # Delete File After Sending
+            os.remove(file_name)
+            await message.reply("🗑️ ឯកសារត្រូវបានលុបដោយស្វ័យប្រវត្តិ។")
 
-    # Error handler
-    application.add_error_handler(error)
+        else:
+            await message.reply("❌ មិនអាចទាញយកឯកសារបាន!")
 
-    # Start the bot
-    application.run_polling()
+    else:
+        await message.reply("❌ សូមផ្ញើលิงค์ TeraBox ត្រឹមត្រូវ!")
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    executor.start_polling(dp, skip_updates=True)
